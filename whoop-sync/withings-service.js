@@ -233,7 +233,9 @@ async function syncWithingsData(pool) {
   );
 
   // MERGE with existing readings — never overwrite; history is permanent.
-  // Dedupe by timestamp (fallback date), newest first. No trimming.
+  // Dedupe by signature (timestamp + values): a re-fetch of the same data adds
+  // nothing, while distinct readings that share a timestamp are all kept.
+  const signature = (item) => Object.keys(item).sort().map((k) => `${k}=${item[k]}`).join('|');
   let merged = measurements;
   if (existing.rows.length > 0) {
     const existingResult = await pool.query("SELECT data::text FROM \"HealthData\" WHERE id = $1", [existing.rows[0].id]);
@@ -241,11 +243,14 @@ async function syncWithingsData(pool) {
     const combined = [...measurements, ...(existingData.measurements || [])];
     const seen = new Set();
     merged = combined.filter(item => {
-      const key = item.timestamp || item.date;
+      const key = signature(item);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    if (merged.length < measurements.length) {
+      throw new Error(`merge produced fewer readings (${merged.length}) than incoming (${measurements.length}) - refusing to write`);
+    }
     console.log(`Withings merge: ${measurements.length} incoming + ${merged.length - measurements.length} kept = ${merged.length} total`);
   }
 
