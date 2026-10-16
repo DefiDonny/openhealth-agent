@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build app
+        run: npm ci && npm run build
+        env:
+          # Dummy values so the build can run without a database or real keys.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          AUTH_SECRET: ci-dummy-not-a-real-secret
+          ENCRYPTION_KEY: 00000000000000000000000000000000
+          NEXTAUTH_URL: http://localhost:3000
+          DEPLOYMENT_ENV: local
+
+      - name: Syntax-check whoop-sync service
+        run: |
+          node --check whoop-sync/server.js
+          node --check whoop-sync/withings-service.js
+
+      - name: Secrets and PII gate
+        run: |
+          # Fails the build if personal identifiers, hosts or secret literals
+          # ever land in the tree. The workflows directory is excluded because
+          # this file contains the search patterns themselves.
+          ! grep -rIlE 'apinand|dabpetch|health\.apinand|[Dd]onny' --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
+          ! grep -rIlE '/opt/|/home/ubuntu|lightsail' --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
+          ! grep -rInE "(PASSWORD|SECRET|API_KEY|TOKEN|CLIENT_ID)[A-Z_]*[ ]*[:=][ ]*['\"][A-Za-z0-9_./+-]{12,}" --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
