@@ -1,181 +1,108 @@
-# 🚀 **OpenHealth**
+# OpenHealth Agent
 
-<div align="center">
+**An agent-assisted Whoop-connected daily health companion, built on OpenHealth.**
 
-**AI Health Assistant | Powered by Your Data**
+Self-host your own health hub: connect your wearable and scale, keep the data on your own
+server, and talk to it through an AI assistant that knows your numbers. No cloud account
+required.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Platform-Web-blue?style=for-the-badge" alt="Platform">
-  <img src="https://img.shields.io/badge/Language-TypeScript-blue?style=for-the-badge" alt="Language">
-  <img src="https://img.shields.io/badge/Framework-Next.js-black?style=for-the-badge" alt="Framework">
-</p>
+> Community-maintained, not affiliated with OpenHealthForAll — see Credits.
 
-> **📢 Now Available on Web!**  
-> We've made OpenHealth more accessible with two tailored options:  
-> **[Clinic](https://qna.open-health.me/)** - Quick and easy health consultations  
-> **[Full Platform](https://www.open-health.me/)** - Advanced tools for comprehensive health management
+## Screenshots
 
-### 🌍 Choose Your Language
-[English](README.md) | [Français](i18n/readme/README.fr.md) | [Deutsch](i18n/readme/README.de.md) | [Español](i18n/readme/README.es.md) | [한국어](i18n/readme/README.ko.md) | [中文](i18n/readme/README.zh.md) | [日本語](i18n/readme/README.ja.md) | [Українська](i18n/readme/README.uk.md) | [Русский](i18n/readme/README.ru.md) | [اردو](i18n/readme/README.ur.md)
+_Coming from the demo instance (synthetic data) — see [`demo/`](demo/README.md)._
 
-</div>
+## What it does
 
----
+- **WHOOP sync** — recovery, sleep, strain and workouts, merged into permanent history.
+  Each install uses its own WHOOP developer app: [docs/WHOOP-SETUP.md](docs/WHOOP-SETUP.md).
+- **Withings sync** — weight, body composition and blood pressure. Readings are **merged,
+  never overwritten**: [docs/WITHINGS-SETUP.md](docs/WITHINGS-SETUP.md).
+- **Manual readings** — blood pressure / weight entries by hand, CSV or API
+  (`POST /api/readings`) into a record no sync ever touches.
+- **Dashboard** — weight trend (sparkline with real axes and delta) and sleep history.
+- **Document parsing** — upload blood-test PDFs/images; a vision model extracts structured
+  results (no Docling/OCR stack to babysit).
+- **Assistant modes** — GP, orthopaedics, nutrition, exercise, internal medicine, mental
+  health: prepared context for the chat.
+- **Bring your own LLM** — configure the provider/model per consultation room.
 
-<p align="center">
-  <img src="/intro/openhealth.avif" alt="OpenHealth Demo">
-</p>
+## Why this version
 
-## 🌟 Overview
+Upstream [OpenHealthForAll/open-health](https://github.com/OpenHealthForAll/open-health)
+has been effectively unmaintained since early 2026 (last release v0.2.0, Feb 2025). This is
+a community fork that keeps it working and usable day to day:
 
-> OpenHealth helps you **take charge of your health data**. By leveraging AI and your personal health information,
-> OpenHealth provides a private assistant that helps you better understand and manage your health. You can run it completely locally for maximum privacy.
+| | Upstream | This project |
+|---|---|---|
+| Document parsing | Docling (fails on small VPSes) | Direct image-model parsing with retries |
+| Wearable/scale sync | — | WHOOP + Withings service, permanent merge |
+| Manual readings | — | `MANUAL_READINGS` + `/api/readings` |
+| Dashboard | basic | weight/sleep sparklines with axes + tooltips |
+| Model support | Claude 3.5/3.7 only | current models (the chat default ships as `claude-sonnet-5-5`) |
+| Deployment | manual | one-command Docker Compose + self-hosting guide |
+| Secrets | literals in code | environment-only, no fallbacks |
+| Sync/OAuth endpoints | unauthenticated | key-gated; OAuth state-protected |
 
-## ✨ Project Features
+## Quick start
 
-<details open>
-<summary><b>Core Features</b></summary>
-
-- 📊 **Centralized Health Data Input:** Easily consolidate all your health data in one place.
-- 🛠️ **Smart Parsing:** Automatically parses your health data and generates structured data files.
-- 🤝 **Contextual Conversations:** Use the structured data as context for personalized interactions with GPT-powered AI.
-
-</details>
-
-## 📥 Supporting Data Sources & Language Models
-
-<table>
-  <tr>
-    <th>Data Sources You Can Add</th>
-    <th>Supported Language Models</th>
-  </tr>
-  <tr>
-    <td>
-      • Blood Test Results<br>
-      • Health Checkup Data<br>
-      • Personal Physical Information<br>
-      • Family History<br>
-      • Symptoms
-    </td>
-    <td>
-      • LLaMA<br>
-      • DeepSeek-V3<br>
-      • GPT<br>
-      • Claude<br>
-      • Gemini
-    </td>
-  </tr>
-</table>
-
-## 🤔 Why We Built OpenHealth
-
-> - 💡 **Your health is your responsibility.**
-> - ✅ True health management combines **your data** + **intelligence**, turning insights into actionable plans.
-> - 🧠 AI acts as an unbiased tool to guide and support you in managing your long-term health effectively.
-
-## 🗺️ Project Diagram
-
-```mermaid
-graph LR
-    subgraph Health Data Sources
-        A1[Clinical Records<br>Blood Tests/Diagnoses/<br>Prescriptions/Imaging]
-        A2[Health Platforms<br>Apple Health/Google Fit]
-        A3[Wearable Devices<br>Oura/Whoop/Garmin]
-        A4[Personal Records<br>Diet/Symptoms/<br>Family History]
-    end
-
-    subgraph Data Processing
-        B1[Data Parser & Standardization]
-        B2[Unified Health Data Format]
-    end
-
-    subgraph AI Integration
-        C1[LLM Processing<br>Commercial & Local Models]
-        C2[Interaction Methods<br>RAG/Cache/Agents]
-    end
-
-    A1 & A2 & A3 & A4 --> B1
-    B1 --> B2
-    B2 --> C1
-    C1 --> C2
-
-    style A1 fill:#e6b3cc,stroke:#cc6699,stroke-width:2px,color:#000
-    style A2 fill:#b3d9ff,stroke:#3399ff,stroke-width:2px,color:#000
-    style A3 fill:#c2d6d6,stroke:#669999,stroke-width:2px,color:#000
-    style A4 fill:#d9c3e6,stroke:#9966cc,stroke-width:2px,color:#000
-    
-    style B1 fill:#c6ecd9,stroke:#66b399,stroke-width:2px,color:#000
-    style B2 fill:#c6ecd9,stroke:#66b399,stroke-width:2px,color:#000
-    
-    style C1 fill:#ffe6cc,stroke:#ff9933,stroke-width:2px,color:#000
-    style C2 fill:#ffe6cc,stroke:#ff9933,stroke-width:2px,color:#000
-
-    classDef default color:#000
+```bash
+git clone https://github.com/DefiDonny/openhealth-agent.git
+cd openhealth-agent
+cp .env.example .env       # fill it in: openssl rand -hex 32 for the secrets
+docker compose up -d --build
 ```
 
-> **Note:** The data parsing functionality is currently implemented in a separate Python server and is planned to be migrated to TypeScript in the future.
+Put it behind a reverse proxy with TLS (nginx example in the self-hosting guide), open the
+site, create your account, and optionally seed the demo data to see the dashboard
+immediately.
 
-## Getting Started
+- Full guide: **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**
+- Device setup: **[WHOOP](docs/WHOOP-SETUP.md)** · **[Withings](docs/WITHINGS-SETUP.md)**
+- Demo data: **[demo/README.md](demo/README.md)**
 
-## ⚙️ How to Run OpenHealth
+## Requirements
 
-<details open>
-<summary><b>Installation Instructions</b></summary>
+- Docker + Docker Compose
+- A domain with HTTPS (OAuth callbacks need a stable public URL)
+- Optional: a WHOOP and/or Withings account. Other scales can be fed via CSV/API —
+  pluggable providers are on the roadmap.
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/OpenHealthForAll/open-health.git
-   cd open-health
-   ```
+## Security notes
 
-2. **Setup and Run:**
-   ```bash
-   # Copy environment file
-   cp .env.example .env
+- All secrets live in `.env`; the code contains no credentials, and CI scans every push
+  for secrets, personal identifiers and server paths.
+- The sync service's `/connect`, `/status` and `/sync` endpoints require an
+  `X-Sync-Key` header (browsers go through the app's authenticated relay at
+  `/api/integrations/*`); OAuth callbacks remain public but are state-protected.
+- Uploads require a logged-in session.
+- App and database bind to `127.0.0.1` by default — expose only through your reverse proxy.
 
-   # Start the application using Docker/Podman Compose
-   docker/podman compose --env-file .env up
-   ```
+## Roadmap
 
-   For existing users, use:
-   ```bash
-   # Generate ENCRYPTION_KEY for .env file:
-   # Run the command below and add the output to ENCRYPTION_KEY in .env
-   echo $(head -c 32 /dev/urandom | base64)
+- CSV import for other scales/exporters; pluggable weight providers
+- Blood-pressure card on the dashboard
+- Real internationalization (the upstream language packs cover the original UI; new
+  components are English-only — Thai is planned)
+- Published container images (GHCR) so servers pull instead of building
 
-   # Rebuild and start the application
-   docker/podman compose --env-file .env up --build
-   ```
-   to rebuild the image. Run this also if you make any modifications to the .env file.
+## Contributing
 
-3. **Access OpenHealth:**
-   Open your browser and navigate to `http://localhost:3000` to begin using OpenHealth.
+Open an issue before large PRs so we can agree on scope. Keep commits focused, run
+`npm run build` before pushing (CI does too), and never commit real health data,
+credentials or personal identifiers — the CI secrets gate rejects them. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-> **Note:** The system consists of two main components: parsing and LLM. For parsing, you can use docling for full local execution, while the LLM component can run fully locally using Ollama.
+## Credits & license
 
-> **Note:** If you're using Ollama with Docker, make sure to set the Ollama API endpoint to: `http://docker.for.mac.localhost:11434` on a Mac or `http://host.docker.internal:11434` on Windows.
+- Based on [OpenHealth](https://github.com/OpenHealthForAll/open-health) by
+  OpenHealthForAll — AGPL-3.0, upstream copyright retained. Changes from upstream are
+  listed in [CHANGES.md](CHANGES.md) and [NOTICE.md](NOTICE.md).
+- Community-maintained. **Not affiliated with or endorsed by OpenHealthForAll.**
+- License: **AGPL-3.0**.
 
-</details>
+## Disclaimer
 
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=OpenHealthForAll/open-health&type=Date)](https://star-history.com/#OpenHealthForAll/open-health&Date)
-
----
-
-## 🌐 Community and Support
-
-<div align="center">
-
-### 💫 Share Your Story & Get Updated & Give Feedback
-[![AIDoctor Subreddit](https://img.shields.io/badge/r/AIDoctor-FF4500?style=for-the-badge&logo=reddit&logoColor=white)](https://www.reddit.com/r/AIDoctor/)
-[![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/B9K654g4wf)
-
-### 🤝 Talk with Team
-[![Calendly](https://img.shields.io/badge/Schedule_Meeting-00A2FF?style=for-the-badge&logo=calendar&logoColor=white)](https://calendly.com/open-health/30min)
-[![Email](https://img.shields.io/badge/Send_Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:sj@open-health.me)
-
-</div>
-
+This is a personal health data tool — **not a medical device and not medical advice**. It
+stores and presents data you provide; decisions about your health are yours and your
+clinician's.
