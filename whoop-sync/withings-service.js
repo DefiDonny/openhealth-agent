@@ -75,9 +75,9 @@ async function refreshWithingsToken(tokens) {
   throw new Error('Withings token refresh failed: ' + JSON.stringify(data));
 }
 
-function setupWithingsRoutes(app, pool) {
+function setupWithingsRoutes(app, pool, requireSyncAuth) {
   // OAuth initiate
-  app.get('/api/withings/connect', (req, res) => {
+  app.get('/api/withings/connect', requireSyncAuth, (req, res) => {
     pendingWithingsState = crypto.randomBytes(16).toString('hex');
     const params = new URLSearchParams({
       response_type: 'code',
@@ -94,8 +94,8 @@ function setupWithingsRoutes(app, pool) {
     const { code, state, error } = req.query;
     if (error) return res.status(400).send(`Withings error: ${error}`);
     if (!code) return res.status(400).send('Missing authorization code');
-    if (pendingWithingsState && state !== pendingWithingsState) {
-      return res.status(400).send('Invalid state');
+    if (!state || state !== pendingWithingsState) {
+      return res.status(400).send('Invalid OAuth state - possible CSRF. Go back and click Connect again.');
     }
     pendingWithingsState = null;
 
@@ -145,7 +145,7 @@ function setupWithingsRoutes(app, pool) {
   });
 
   // Status
-  app.get('/api/withings/status', (req, res) => {
+  app.get('/api/withings/status', requireSyncAuth, (req, res) => {
     const tokens = loadWithingsTokens();
     res.json({
       connected: !!tokens,
@@ -155,7 +155,7 @@ function setupWithingsRoutes(app, pool) {
   });
 
   // Manual sync
-  app.post('/api/withings/sync', async (req, res) => {
+  app.post('/api/withings/sync', requireSyncAuth, async (req, res) => {
     try {
       const result = await syncWithingsData(pool);
       res.json({ success: true, ...result });
@@ -221,32 +221,48 @@ async function syncWithingsData(pool) {
   // Sort by date descending
   measurements.sort((a, b) => b.timestamp - a.timestamp);
 
-  // Build compact data
-  const withingsData = {
-    source: 'Withings Smart Scale',
-    fileName: 'Withings Body Composition',
-    synced_at: new Date().toISOString(),
-    measurement_count: measurements.length,
-    measurements: measurements,
-  };
-
   // Get admin user ID
   const userResult = await pool.query("SELECT id FROM \"User\" WHERE username = 'admin' LIMIT 1");
   if (userResult.rows.length === 0) throw new Error('Admin user not found');
   const userId = userResult.rows[0].id;
 
-  // Upsert
+  // Find existing record
   const existing = await pool.query(
     "SELECT id FROM \"HealthData\" WHERE \"authorId\" = $1 AND type = 'WITHINGS_DATA'",
     [userId]
   );
+
+  // MERGE with existing readings — never overwrite; history is permanent.
+  // Dedupe by timestamp (fallback date), newest first. No trimming.
+  let merged = measurements;
+  if (existing.rows.length > 0) {
+    const existingResult = await pool.query("SELECT data::text FROM \"HealthData\" WHERE id = $1", [existing.rows[0].id]);
+    const existingData = JSON.parse(existingResult.rows[0].data || '{}');
+    const combined = [...measurements, ...(existingData.measurements || [])];
+    const seen = new Set();
+    merged = combined.filter(item => {
+      const key = item.timestamp || item.date;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    console.log(`Withings merge: ${measurements.length} incoming + ${merged.length - measurements.length} kept = ${merged.length} total`);
+  }
+
+  const withingsData = {
+    source: 'Withings Smart Scale',
+    fileName: 'Withings Body Composition',
+    synced_at: new Date().toISOString(),
+    measurement_count: merged.length,
+    measurements: merged,
+  };
 
   if (existing.rows.length > 0) {
     await pool.query(
       "UPDATE \"HealthData\" SET data = $1, \"updatedAt\" = NOW() WHERE id = $2",
       [JSON.stringify(withingsData), existing.rows[0].id]
     );
-    console.log('Updated Withings data');
+    console.log('Updated Withings data (merged, no readings lost)');
   } else {
     const cuid = 'withings_' + Date.now().toString(36);
     await pool.query(
@@ -263,8 +279,9 @@ async function syncWithingsData(pool) {
   console.log(`[${new Date().toISOString()}] Withings sync complete: ${measurements.length} measurements`);
   return {
     synced_at: tokens.last_sync,
-    measurements: measurements.length,
-    latest: measurements[0] || null,
+    new_measurements: measurements.length,
+    total_measurements: merged.length,
+    latest: merged[0] || null,
   };
 }
 

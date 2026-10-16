@@ -23,6 +23,18 @@ if (missingEnv.length) {
 }
 
 // OAuth state storage
+// Request auth: localhost (cron, health checks) or X-Sync-Key header (app relay route).
+// Browser flows go through the authenticated app route /api/integrations/<provider>/<action>.
+const SYNC_API_KEY = process.env.SYNC_API_KEY || null;
+function requireSyncAuth(req, res, next) {
+  const remote = req.socket.remoteAddress || '';
+  const isLocal = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+  if (isLocal) return next();
+  if (SYNC_API_KEY && req.get('x-sync-key') === SYNC_API_KEY) return next();
+  return res.status(401).json({ error: 'unauthorized', hint: 'Use the app integrations route, or send X-Sync-Key' });
+}
+
+// OAuth state storage
 let pendingOAuthState = null;
 
 // Database connection to OpenHealth's PostgreSQL
@@ -87,7 +99,7 @@ async function whoopGet(endpoint, tokens) {
 }
 
 // OAuth initiate — with required state parameter
-app.get('/api/whoop/connect', (req, res) => {
+app.get('/api/whoop/connect', requireSyncAuth, (req, res) => {
   const scopes = 'offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement';
   pendingOAuthState = crypto.randomBytes(16).toString('hex');
   const params = new URLSearchParams({
@@ -113,7 +125,7 @@ app.get('/api/whoop/callback', async (req, res) => {
         <div>
           <h1 style="color:#ef4444">WHOOP Connection Failed</h1>
           <p style="color:#94a3b8">${error}: ${error_description || 'Unknown error'}</p>
-          <a href="${PUBLIC_BASE_URL}/api/whoop/connect" style="color:#06b6d4;margin-top:20px;display:inline-block">Try Again</a>
+          <a href="${PUBLIC_BASE_URL}/api/integrations/whoop/connect" style="color:#06b6d4;margin-top:20px;display:inline-block">Try Again</a>
         </div>
       </body>
       </html>
@@ -122,8 +134,8 @@ app.get('/api/whoop/callback', async (req, res) => {
   
   if (!code) return res.status(400).send('Missing authorization code');
   
-  if (pendingOAuthState && state !== pendingOAuthState) {
-    return res.status(400).send('Invalid OAuth state - possible CSRF attack');
+  if (!state || state !== pendingOAuthState) {
+    return res.status(400).send('Invalid OAuth state - possible CSRF attack. Go back and click Connect again.');
   }
   pendingOAuthState = null;
 
@@ -172,7 +184,7 @@ app.get('/api/whoop/callback', async (req, res) => {
 });
 
 // Status endpoint
-app.get('/api/whoop/status', (req, res) => {
+app.get('/api/whoop/status', requireSyncAuth, (req, res) => {
   const tokens = loadTokens();
   res.json({
     connected: !!tokens,
@@ -182,7 +194,7 @@ app.get('/api/whoop/status', (req, res) => {
 });
 
 // Manual sync trigger
-app.post('/api/whoop/sync', async (req, res) => {
+app.post('/api/whoop/sync', requireSyncAuth, async (req, res) => {
   try {
     const result = await syncWhoopData();
     res.json({ success: true, ...result });
@@ -386,7 +398,7 @@ async function syncWhoopData() {
 
 // Withings integration
 const { setupWithingsRoutes, syncWithingsData: syncWithings } = require("./withings-service");
-setupWithingsRoutes(app, pool);
+setupWithingsRoutes(app, pool, requireSyncAuth);
 
 // Start server
 app.listen(PORT, '127.0.0.1', () => {
