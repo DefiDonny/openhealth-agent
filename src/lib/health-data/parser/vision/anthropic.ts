@@ -29,7 +29,7 @@ export class AnthropicVisionParser extends BaseVisionParser {
             model: options.model.id,
             apiKey: currentDeploymentEnv === 'cloud' ? process.env.ANTHROPIC_API_KEY : options.apiKey,
             maxTokens: 4096,
-            topP: null,
+            topP: undefined,
         })
         const messages = options.messages || ChatPromptTemplate.fromMessages([]);
         const chain = messages.pipe(llm.withStructuredOutput(HealthCheckupSchema, {

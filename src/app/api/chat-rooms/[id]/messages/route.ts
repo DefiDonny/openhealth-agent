@@ -184,7 +184,7 @@ export async function POST(
                         anthropicApiUrl: llmProvider.apiURL,
                         model: llmProviderModelId,
                         maxTokens: 4096,
-                        topP: null,
+                        topP: undefined,
                     }).withConfig({metadata: {chatRoomId: id}, runName: 'chat'})
 
                     const chatStream = await anthropic.stream(messages)
