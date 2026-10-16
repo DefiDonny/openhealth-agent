@@ -103,6 +103,10 @@ const HealthDataType = {
         id: 'WHOOP_DATA',
         name: 'WHOOP Wearable Data'
     },
+    MANUAL_READINGS: {
+        id: 'MANUAL_READINGS',
+        name: 'Manual Readings'
+    },
     SYMPTOMS: {
         id: 'SYMPTOMS',
         name: 'Symptoms'

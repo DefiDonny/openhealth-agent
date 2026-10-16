@@ -230,14 +230,18 @@ export default function Screen(
         whoopRecord?.data?.sleep_history || [];
     const latestSleep = sleepHistory[0] || null;
 
-    // Weight data: combine Xiaomi history + Withings
+    // Weight data: historical + Withings + manual readings
     const weightHistoryRecord = healthDataListResponse?.healthDataList?.find((d) => d.type === 'WEIGHT_HISTORY');
     const withingsRecord = healthDataListResponse?.healthDataList?.find((d) => d.type === 'WITHINGS_DATA');
+    const manualRecord = healthDataListResponse?.healthDataList?.find((d) => d.type === 'MANUAL_READINGS');
     const allWeights: Array<{date: string, weight_kg: number}> = [
         ...(weightHistoryRecord?.data?.measurements || []).map((m: any) => ({date: m.date, weight_kg: m.weight_kg})),
         ...(withingsRecord?.data?.measurements || [])
             .filter((m: any) => m.weight_kg)
             .map((m: any) => ({date: m.date, weight_kg: m.weight_kg})),
+        ...(manualRecord?.data?.readings || [])
+            .filter((r: any) => r.kind === 'weight' && r.values?.weight_kg)
+            .map((r: any) => ({date: r.date, weight_kg: r.values.weight_kg})),
     ].sort((a: any, b: any) => b.date.localeCompare(a.date));
     const latestWeight = allWeights[0] || null;
     const prevWeight = allWeights.length > 1 ? allWeights[1] : null;
