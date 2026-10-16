@@ -23,15 +23,13 @@ if (missingEnv.length) {
 }
 
 // OAuth state storage
-// Request auth: localhost (cron, health checks) or X-Sync-Key header (app relay route).
+// Request auth: X-Sync-Key header only. Nginx proxies public traffic from localhost,
+// so a localhost exemption would leave these endpoints world-open. The cron scripts send the key.
 // Browser flows go through the authenticated app route /api/integrations/<provider>/<action>.
 const SYNC_API_KEY = process.env.SYNC_API_KEY || null;
 function requireSyncAuth(req, res, next) {
-  const remote = req.socket.remoteAddress || '';
-  const isLocal = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
-  if (isLocal) return next();
   if (SYNC_API_KEY && req.get('x-sync-key') === SYNC_API_KEY) return next();
-  return res.status(401).json({ error: 'unauthorized', hint: 'Use the app integrations route, or send X-Sync-Key' });
+  return res.status(401).json({ error: 'unauthorized', hint: SYNC_API_KEY ? 'Send X-Sync-Key' : 'SYNC_API_KEY is not configured' });
 }
 
 // OAuth state storage
