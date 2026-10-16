@@ -41,7 +41,7 @@ let pendingOAuthState = null;
 const pool = new Pool({
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
-  host: 'localhost',
+  host: process.env.POSTGRES_HOST || 'localhost',
   port: 5432,
   database: process.env.POSTGRES_DB
 });
@@ -400,9 +400,37 @@ async function syncWhoopData() {
 const { setupWithingsRoutes, syncWithingsData: syncWithings } = require("./withings-service");
 setupWithingsRoutes(app, pool, requireSyncAuth);
 
+// Optional internal daily scheduler for deployments without host cron
+// (e.g. containers). Enable with SYNC_CRON_ENABLED=true; runs at
+// SYNC_CRON_UTC_HOUR:00 UTC (default 2). Off by default so host-cron setups
+// never double-sync.
+function scheduleInternalSync() {
+  if (process.env.SYNC_CRON_ENABLED !== 'true') return;
+  const hour = parseInt(process.env.SYNC_CRON_UTC_HOUR || '2', 10);
+  const run = async () => {
+    console.log(`[CRON] Internal daily sync starting at ${new Date().toISOString()}`);
+    try { await syncWhoopData(); } catch (e) { console.error('[CRON] WHOOP sync failed:', e.message); }
+    try { await syncWithings(pool); } catch (e) { console.error('[CRON] Withings sync failed:', e.message); }
+  };
+  const scheduleNext = () => {
+    const now = new Date();
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour, 0, 0));
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    console.log(`[CRON] Next internal sync at ${next.toISOString()}`);
+    setTimeout(async () => { await run(); scheduleNext(); }, next.getTime() - now.getTime());
+  };
+  scheduleNext();
+}
+scheduleInternalSync();
+
 // Start server
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`WHOOP sync service running on port ${PORT}`);
+// BIND_HOST accepts a comma-separated list (e.g. "127.0.0.1,172.17.0.1") so the
+// service can serve localhost and the Docker bridge without public exposure.
+const bindHosts = (process.env.BIND_HOST || '127.0.0.1').split(',').map(h => h.trim()).filter(Boolean);
+bindHosts.forEach((host) => {
+  app.listen(PORT, host, () => {
+    console.log(`WHOOP sync service running on ${host}:${PORT}`);
+  });
 });
 
 module.exports = { syncWhoopData };
