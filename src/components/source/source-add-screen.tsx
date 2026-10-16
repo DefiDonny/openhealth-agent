@@ -87,6 +87,22 @@ const HealthDataType = {
         id: 'PERSONAL_INFO',
         name: 'Personal Info'
     },
+    WEIGHT_HISTORY: {
+        id: 'WEIGHT_HISTORY',
+        name: 'Historical Weight Data'
+    },
+    WITHINGS_DATA: {
+        id: 'WITHINGS_DATA',
+        name: 'Withings Body Composition'
+    },
+    MEDICATIONS: {
+        id: 'MEDICATIONS',
+        name: 'Medications & Supplements'
+    },
+    WHOOP_DATA: {
+        id: 'WHOOP_DATA',
+        name: 'WHOOP Wearable Data'
+    },
     SYMPTOMS: {
         id: 'SYMPTOMS',
         name: 'Symptoms'
@@ -1216,7 +1232,7 @@ export default function SourceAddScreen() {
                             onFileUpload={handleFileUpload}
                             onAddSymptoms={handleAddSymptoms}/>
                         <div className="flex-1 overflow-y-auto">
-                            {healthDataList?.healthDataList?.map((item) => (
+                            {healthDataList?.healthDataList?.filter(item => item.type !== 'PERSONAL_INFO').map((item) => (
                                 <HealthDataItem
                                     key={item.id}
                                     healthData={item}
@@ -1247,7 +1263,7 @@ export default function SourceAddScreen() {
 
                 <div className={cn(
                     "border-l transition-all duration-300 flex flex-col",
-                    isOpen ? "w-96" : "w-12"
+                    "w-0 overflow-hidden opacity-0 pointer-events-none max-w-0"
                 )}>
                     {isOpen ? (
                         <>

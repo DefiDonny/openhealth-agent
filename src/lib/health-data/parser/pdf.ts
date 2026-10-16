@@ -7,12 +7,12 @@ import {getFileMd5, processBatchWithConcurrency} from "@/lib/health-data/parser/
 import {getParsePrompt, MessagePayload} from "@/lib/health-data/parser/prompt";
 import visions from "@/lib/health-data/parser/vision";
 import documents from "@/lib/health-data/parser/document";
-import {put} from "@vercel/blob";
+// import {put} from "@vercel/blob"; // removed for self-hosted
 import {currentDeploymentEnv} from "@/lib/current-deployment-env";
 import fs from "node:fs";
 import {fromBuffer as pdf2picFromBuffer} from 'pdf2pic'
-import {tasks} from "@trigger.dev/sdk/v3";
-import type {pdfToImages} from "@/trigger/pdf-to-image";
+// import {tasks} from "@trigger.dev/sdk/v3"; // removed for self-hosted
+// import type {pdfToImages} from "@/trigger/pdf-to-image"; // removed for self-hosted
 
 interface VisionParserOptions {
     parser: string;
@@ -39,6 +39,42 @@ interface InferenceOptions {
     excludeText: boolean,
     visionParser: VisionParserOptions
     documentParser: DocumentParserOptions
+}
+
+
+
+// Universal file reader: handles both URLs and local paths
+async function fetchOrRead(pathOrUrl: string): Promise<Response> {
+    // Convert /api/static/uploads/ paths to local filesystem paths
+    const localMatch = pathOrUrl.match(/\/api\/static\/uploads\/(.+)$/);
+    if (localMatch) {
+        const localPath = `./public/uploads/${localMatch[1]}`;
+        const fs = await import('fs');
+        try {
+            const buffer = fs.readFileSync(localPath);
+            console.log('[PDF] Read local file:', localPath, buffer.length, 'bytes');
+            return new Response(buffer);
+        } catch (e) {
+            console.log('[PDF] Local file not found, falling back to fetch:', pathOrUrl);
+        }
+    }
+    // Fall back to fetch for real URLs
+    return fetch(pathOrUrl);
+}
+
+// Helper: convert upload URL to local file path for Docling
+function urlToLocalPath(urlOrPath: string): string {
+    // Convert /api/static/uploads/X to ./public/uploads/X
+    const apiMatch = urlOrPath.match(/\/api\/static\/uploads\/(.+)$/);
+    if (apiMatch) return `./public/uploads/${apiMatch[1]}`;
+    // If it's already a local ./ path, return as-is
+    if (urlOrPath.startsWith('./')) return urlOrPath;
+    // If it's a data: URI, skip
+    if (urlOrPath.startsWith('data:')) return urlOrPath;
+    // Extract filename from URL like https://your-domain.example/api/static/uploads/FILENAME
+    const match = urlOrPath.match(/\/uploads\/([^?#]+)$/);
+    if (match) return `./public/uploads/${match[1]}`;
+    return urlOrPath;
 }
 
 async function documentOCR({document, documentParser}: { document: string, documentParser: DocumentParserOptions }) {
@@ -91,7 +127,7 @@ async function inference(inferenceOptions: InferenceOptions) {
     const pageDataList: { page_content: string }[] | undefined = !excludeText ? await processBatchWithConcurrency(
         imagePaths,
         async (path) => {
-            const {content} = await documentParse({document: path, documentParser: documentParserOptions})
+            const {content} = await documentParse({document: urlToLocalPath(path), documentParser: documentParserOptions})
             const {markdown} = content
             return {page_content: markdown}
         },
@@ -102,9 +138,20 @@ async function inference(inferenceOptions: InferenceOptions) {
     const imageDataList: string[] = !excludeImage ? await processBatchWithConcurrency(
         imagePaths,
         async (path) => {
-            const fileResponse = await fetch(path)
-            const buffer = Buffer.from(await fileResponse.arrayBuffer())
-            return `data:image/png;base64,${buffer.toString('base64')}`
+            const localPath = urlToLocalPath(path);
+            let buffer: Buffer;
+            if (localPath.startsWith('./') || localPath.startsWith('/')) {
+                // Read from local filesystem
+                const fs = await import('fs');
+                buffer = fs.readFileSync(localPath);
+            } else {
+                // Fetch from URL
+    console.log("[PDF-DEBUG] fetch target at line ~126:", typeof arguments !== "undefined" ? "has args" : "no args");
+
+                const fileResponse = await fetchOrRead(path);
+                buffer = Buffer.from(await fileResponse.arrayBuffer());
+            }
+            return `data:image/png;base64,${buffer.toString('base64')}`;
         },
         4
     ) : []
@@ -215,7 +262,17 @@ async function inference(inferenceOptions: InferenceOptions) {
  * @returns {Promise<string[]>} - List of image paths
  */
 async function documentToImages({file: filePath}: Pick<SourceParseOptions, 'file'>): Promise<string[]> {
-    const fileResponse = await fetch(filePath);
+    let fileResponse;
+    const localFilePath = urlToLocalPath(filePath);
+    if (localFilePath.startsWith('./') || localFilePath.startsWith('/')) {
+        const fs = await import('fs');
+        const fileBuffer = fs.readFileSync(localFilePath);
+        fileResponse = new Response(fileBuffer);
+    } else {
+    console.log("[PDF-DEBUG] fetch target at line ~247:", typeof arguments !== "undefined" ? "has args" : "no args");
+
+        fileResponse = await fetchOrRead(filePath);
+    }
     const fileBuffer = Buffer.from(await fileResponse.arrayBuffer())
     const result = await fileTypeFromBuffer(fileBuffer)
     const fileHash = await getFileMd5(fileBuffer)
@@ -225,21 +282,10 @@ async function documentToImages({file: filePath}: Pick<SourceParseOptions, 'file
     // Convert pdf to images, or use the image as is
     const images: string[] = []
     if (mime === 'application/pdf') {
-        if (currentDeploymentEnv === 'local') {
+        if (true) {
             const pdf2picConverter = pdf2picFromBuffer(fileBuffer, {preserveAspectRatio: true})
             for (const image of await pdf2picConverter.bulk(-1, {responseType: 'base64'})) {
                 if (image.base64) images.push(`data:image/png;base64,${image.base64}`)
-            }
-        } else {
-            const result = await tasks.triggerAndPoll<typeof pdfToImages>(
-                'pdf-to-image',
-                {pdfUrl: filePath},
-                {pollIntervalMs: 5000},
-            )
-            if (result.status === 'COMPLETED' && result.output) {
-                images.push(...result.output.images.map((image) => `data:image/png;base64,${image}`))
-            } else {
-                throw new Error('Failed to convert the pdf to images')
             }
         }
     } else {
@@ -249,16 +295,9 @@ async function documentToImages({file: filePath}: Pick<SourceParseOptions, 'file
     // Write the image data to a file
     const imagePaths = []
     for (let i = 0; i < images.length; i++) {
-        if (currentDeploymentEnv === 'local') {
+        if (true) {
             fs.writeFileSync(`./public/uploads/${fileHash}_${i}.png`, Buffer.from(images[i].split(',')[1], 'base64'))
-            imagePaths.push(`${process.env.NEXT_PUBLIC_URL}/api/static/uploads/${fileHash}_${i}.png`)
-        } else {
-            const blob = await put(
-                `/uploads/${fileHash}_${i}.png`,
-                Buffer.from(images[i].split(',')[1], 'base64'),
-                {access: 'public', contentType: 'image/png'}
-            )
-            imagePaths.push(blob.downloadUrl)
+            imagePaths.push(`/api/static/uploads/${fileHash}_${i}.png`)
         }
     }
 
@@ -275,31 +314,32 @@ export async function parseHealthData(options: SourceParseOptions) {
 
     // VisionParser
     const visionParser = options.visionParser || {
-        parser: 'OpenAI',
-        model: 'gpt-4o',
+        parser: 'Anthropic',
+        model: 'claude-sonnet-4-20250514',
         apiKey: process.env.OPENAI_API as string
     }
 
     // Document Parser
     const documentParser = options.documentParser || {
-        parser: 'Upstage',
+        parser: 'Docling',
         model: 'document-parse',
         apiKey: process.env.UPSTAGE_API_KEY as string
     }
 
     // prepare images
+    console.log('[PDF-DEBUG] documentToImages called with filePath:', filePath);
     const imagePaths = await documentToImages({file: filePath})
 
     // prepare ocr results
     const ocrResults = await documentOCR({
-        document: filePath,
+        document: urlToLocalPath(filePath),
         documentParser: documentParser
     })
 
     // prepare parse results
     await processBatchWithConcurrency(
         imagePaths,
-        async (path) => documentParse({document: path, documentParser: documentParser}),
+        async (path) => documentParse({document: urlToLocalPath(path), documentParser: documentParser}),
         3
     )
 

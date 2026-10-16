@@ -1,34 +1,28 @@
 'use client';
 
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Input} from "@/components/ui/input";
-import {Textarea} from "@/components/ui/textarea";
 import React, {useEffect, useMemo, useState} from "react";
 import useSWR from "swr";
 import {AssistantMode, AssistantModeListResponse} from "@/app/api/assistant-modes/route";
 import {ChatRoomGetResponse} from "@/app/api/chat-rooms/[id]/route";
-import {AssistantModePatchRequest} from "@/app/api/assistant-modes/[id]/route";
 import {LLMProvider, LLMProviderListResponse} from "@/app/api/llm-providers/route";
 import {LLMProviderModel, LLMProviderModelListResponse} from "@/app/api/llm-providers/[id]/models/route";
-import {cn} from "@/lib/utils";
-import {ConditionalDeploymentEnv} from "@/components/common/deployment-env";
-import {useTranslations} from "next-intl";
-import Link from "next/link";
-import {Plus} from "lucide-react";
+import {AssistantModePatchRequest} from "@/app/api/assistant-modes/[id]/route";
+import {Info} from 'lucide-react';
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+// cn removed — not used in simplified sidebar
+// useTranslations removed — using hardcoded strings for customized UI
 
 interface ChatSettingSideBarProps {
     chatRoomId: string;
 }
 
-export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
-) {
-    const t = useTranslations('ChatSettingSideBar')
+export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps) {
 
     const [selectedAssistantMode, setSelectedAssistantMode] = useState<AssistantMode>();
     const [selectedLLMProvider, setSelectedLLMProvider] = useState<LLMProvider>();
     const [selectedLLMProviderModel, setSelectedLLMProviderModel] = useState<LLMProviderModel>();
     const [llmProviderModels, setLLMProviderModels] = useState<LLMProviderModel[]>([]);
-    const [showApiKey, setShowApiKey] = useState(false);
+    const [infoMode, setInfoMode] = useState<{name: string, prompt: string} | null>(null);
 
     const {
         data: chatRoomData,
@@ -40,7 +34,6 @@ export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
 
     const {
         data: llmProvidersData,
-        mutate: llmProvidersMutate
     } = useSWR<LLMProviderListResponse>('/api/llm-providers', async (url: string) => {
         const response = await fetch(url);
         return response.json();
@@ -52,11 +45,8 @@ export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
         })
     }, [selectedLLMProviderModel]);
 
-    // Initialize assistant mode from localStorage or chatRoomData
     useEffect(() => {
         if (!chatRoomData?.chatRoom.assistantMode) return;
-
-        // If no saved prompt, use the current one and save it
         setSelectedAssistantMode(chatRoomData.chatRoom.assistantMode);
     }, [chatRoomData?.chatRoom.assistantMode?.id]);
 
@@ -85,7 +75,7 @@ export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
     })
     const assistantModes = useMemo(() => assistantModesData?.assistantModes || [], [assistantModesData]);
 
-    // Fetch models when LLM is selected
+    // Fetch models when LLM is selected (still needed for internal state)
     useEffect(() => {
         if (!selectedLLMProvider) return;
         const fetchLLMProviderModels = async () => {
@@ -113,7 +103,6 @@ export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
         });
         const data = await response.json();
 
-        // Get the saved system prompt
         const updatedAssistantMode = {
             ...data.chatRoom.assistantMode,
             systemPrompt: data.chatRoom.assistantMode.systemPrompt
@@ -131,6 +120,7 @@ export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
         setSelectedAssistantMode(updatedAssistantMode);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const onChangeAssistantMode = async (assistantModeId: string, body: AssistantModePatchRequest) => {
         const response = await fetch(`/api/assistant-modes/${assistantModeId}`, {
             method: 'PATCH',
@@ -150,143 +140,56 @@ export default function ChatSettingSideBar({chatRoomId}: ChatSettingSideBarProps
         })
     }
 
-    const onLLMProviderChange = async ({
-                                           apiKey,
-                                           apiURL,
-                                       }: {
-        apiKey?: string,
-        apiURL?: string,
-    }) => {
-        if (!selectedLLMProvider) return;
-
-        const data = {
-            ...selectedLLMProvider,
-            apiKey: apiKey || selectedLLMProvider.apiKey,
-            apiURL: apiURL || selectedLLMProvider.apiURL
-        };
-        setSelectedLLMProvider(data);
-        await fetch(`/api/llm-providers/${selectedLLMProvider.id}`, {
-            method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data),
-        });
-        await llmProvidersMutate();
-        setSelectedLLMProvider(data)
-
-        // Patch ChatRoom with new LLMProvider
-        await onChangeChatRoom({llmProviderId: selectedLLMProvider.id, llmProviderModelId: null});
-    }
-
     return <div className="h-full overflow-y-auto">
-        <div className="p-4 space-y-4">
-            <div className="space-y-4">
-                <h4 className="text-sm font-medium">{t('modelSettings')}</h4>
-                <div className="space-y-2">
-                    <Select value={selectedLLMProvider?.id}
-                            onValueChange={(value) => {
-                                setSelectedLLMProvider(llmProvidersData?.llmProviders.find((provider) => provider.id === value));
-                                setLLMProviderModels([])
-                                setSelectedLLMProviderModel(undefined);
-                                onChangeChatRoom({llmProviderId: value, llmProviderModelId: null});
-                            }}>
-                        <SelectTrigger>
-                            <SelectValue placeholder={t('selectCompany')}/>
-                        </SelectTrigger>
-                        <SelectContent className={cn('bg-white')}>
-                            {llmProvidersData?.llmProviders.map((provider) => <SelectItem
-                                key={provider.id}
-                                value={provider.id}>{provider.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Select value={selectedLLMProviderModel?.id}
-                            onValueChange={(value) => setSelectedLLMProviderModel(llmProviderModels.find((model) => model.id === value))}>
-                        <SelectTrigger>
-                            <SelectValue placeholder={t('selectModel')}/>
-                        </SelectTrigger>
-                        <SelectContent className={cn('bg-white')}>
-                            {llmProviderModels.map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                    {model.name}
-                                </SelectItem>
-                            ))}
-
-                            {llmProviderModels.length === 0 && (
-                                <div className="p-2 text-sm text-gray-500">{t('noModelsFound')}</div>
-                            )}
-                        </SelectContent>
-                    </Select>
-
-                    <ConditionalDeploymentEnv env={['local']}>
-                        {selectedLLMProvider && (['ollama', 'openai'].includes(selectedLLMProvider.providerId)) && (
-                            <Input
-                                type="text"
-                                placeholder={`API endpoint (default: ${selectedLLMProvider?.providerId === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com/v1'})`}
-                                value={selectedLLMProvider?.apiURL}
-                                onChange={(e) => onLLMProviderChange({apiURL: e.target.value})}
-                            />
-                        )}
-                        {selectedLLMProvider?.providerId !== 'ollama' && (
-                            <div className="relative">
-                                <Input
-                                    type={showApiKey ? "text" : "password"}
-                                    placeholder={t('enterApiKey')}
-                                    value={selectedLLMProvider?.apiKey || ''}
-                                    onChange={(e) => onLLMProviderChange({apiKey: e.target.value})}
-                                    className="pr-16"
-                                />
-                                <button
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-sm text-gray-500 hover:text-gray-700"
-                                    onClick={() => setShowApiKey(!showApiKey)}
-                                >
-                                    {showApiKey ? t('hide') : t('show')}
-                                </button>
-                            </div>
-                        )}
-                    </ConditionalDeploymentEnv>
-                </div>
-            </div>
-
+        <div className="p-3 space-y-2">
+            {/* Assistant Mode only — no Model Settings, no System Prompt, no API Key */}
             <div className="space-y-2">
-                <label className="text-sm font-medium">{t('systemPrompt')}</label>
-                <Textarea
-                    value={selectedAssistantMode?.systemPrompt || ''}
-                    onChange={async (e) => {
-                        if (selectedAssistantMode) {
-                            setSelectedAssistantMode({...selectedAssistantMode, systemPrompt: e.target.value});
-                            await onChangeAssistantMode(selectedAssistantMode.id, {systemPrompt: e.target.value});
-                        }
-                    }}
-                    rows={6}
-                    className="resize-none"
-                />
-            </div>
-
-            <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium">{t('assistantMode')}</h4>
-                    <Link href="/assistant-modes/add"
-                          className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800">
-                        <Plus className="mr-1 h-3 w-3"/>
-                        {t('addAssistant')}
-                    </Link>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Available Doctors</h4>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                     {assistantModes.map((assistantMode) => (
                         <button
                             key={assistantMode.id}
-                            className={`w-full p-3 rounded-lg text-left border transition-colors
-                        ${selectedAssistantMode?.id === assistantMode.id ? 'bg-white border-gray-300' :
+                            className={`relative w-full p-2.5 rounded-lg text-left border transition-colors
+                        ${selectedAssistantMode?.id === assistantMode.id ? 'bg-white border-gray-300 shadow-sm' :
                                 'border-transparent hover:bg-gray-100'}`}
                             onClick={async () => {
                                 await onChangeChatRoom({assistantModeId: assistantMode.id});
                             }}
                         >
-                            <div className="text-sm font-medium">{assistantMode.name}</div>
-                            <div className="text-xs text-gray-500">{assistantMode.description}</div>
+                            <div className="text-[13px] font-medium leading-tight pr-5">{assistantMode.name}</div>
+                            <div className="text-[11px] text-gray-500 mt-0.5 leading-tight">{assistantMode.description}</div>
+                            <button
+                                className="absolute top-1.5 right-1.5 p-0.5 text-gray-400 hover:text-blue-500 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setInfoMode({name: assistantMode.name, prompt: assistantMode.systemPrompt});
+                                }}
+                            >
+                                <Info className="w-3.5 h-3.5"/>
+                            </button>
                         </button>
                     ))}
                 </div>
             </div>
         </div>
+
+        {/* Info Dialog — shows full system prompt for a doctor */}
+        <Dialog open={!!infoMode} onOpenChange={() => setInfoMode(null)}>
+            <DialogContent className="max-w-lg max-h-[70vh]">
+                <DialogHeader>
+                    <DialogTitle>{infoMode?.name}</DialogTitle>
+                </DialogHeader>
+                <div className="overflow-y-auto max-h-[50vh] text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                    {infoMode?.prompt}
+                </div>
+                <div className="flex justify-end pt-2">
+                    <button onClick={() => setInfoMode(null)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">
+                        Close
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
 }

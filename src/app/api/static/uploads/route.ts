@@ -1,32 +1,38 @@
-import {handleUpload, type HandleUploadBody} from '@vercel/blob/client';
-import {NextResponse} from 'next/server';
+import {NextResponse} from "next/server";
 import {auth} from "@/auth";
+import fs from "fs";
+import crypto from "node:crypto";
 
 export async function POST(request: Request): Promise<NextResponse> {
-    const body = (await request.json()) as HandleUploadBody;
     const session = await auth();
     if (!session || !session.user) {
-        return NextResponse.json({error: 'Unauthorized'}, {status: 401});
+        return NextResponse.json({error: "Unauthorized"}, {status: 401});
     }
 
     try {
-        const jsonResponse = await handleUpload({
-            body,
-            request,
-            onBeforeGenerateToken: async () => {
-                return {
-                    allowedContentTypes: ['image/*', 'application/pdf'],
-                    tokenPayload: JSON.stringify({userId: session.user?.id}),
-                };
-            },
-            onUploadCompleted: async () => {
-            },
+        const formData = await request.formData();
+        const file = formData.get("file");
+
+        if (!file || !(file instanceof File)) {
+            return NextResponse.json({error: "No file provided"}, {status: 400});
+        }
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const hash = crypto.createHash("md5").update(buffer).digest("hex");
+        const ext = file.name.split(".").pop() || "bin";
+        const filename = `${hash}.${ext}`;
+
+        fs.writeFileSync(`./public/uploads/${filename}`, buffer);
+
+        return NextResponse.json({
+            url: `/api/static/uploads/${filename}`,
+            downloadUrl: `/api/static/uploads/${filename}`,
+            pathname: filename
         });
-        return NextResponse.json(jsonResponse);
     } catch (error) {
         return NextResponse.json(
             {error: (error as Error).message},
-            {status: 400}, // The webhook will retry 5 times waiting for a 200
+            {status: 400}
         );
     }
 }

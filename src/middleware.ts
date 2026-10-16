@@ -3,7 +3,7 @@ import {auth as middleware} from '@/auth';
 const signInPathName = '/login';
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
+// @ts-ignore
 export default middleware((req) => {
     const {nextUrl} = req;
 

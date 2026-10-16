@@ -7,10 +7,10 @@ import {
     DocumentParserModel,
     OCRParseResult
 } from "@/lib/health-data/parser/document/base-document";
-import fetch from 'node-fetch'
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fetch = eval('require')('node-fetch').default;
 import FormData from 'form-data'
 import fs from 'node:fs'
-import {currentDeploymentEnv} from "@/lib/current-deployment-env";
 
 export class DoclingDocumentParser extends BaseDocumentParser {
     get apiKeyRequired(): boolean {
@@ -18,7 +18,7 @@ export class DoclingDocumentParser extends BaseDocumentParser {
     }
 
     get enabled(): boolean {
-        return currentDeploymentEnv === 'local';
+        return true;
     }
 
     get name(): string {
@@ -44,7 +44,10 @@ export class DoclingDocumentParser extends BaseDocumentParser {
         formData.append('ocr_lang', 'en');
         formData.append('ocr_lang', 'ko');
         formData.append('table_mode', 'fast');
-        formData.append('files', fs.createReadStream(options.input));
+        console.log('[DOCLING] options.input:', JSON.stringify(options.input));
+        const localInput = options.input.replace(/^\/api\/static\/uploads\//, './public/uploads/');
+        console.log('[DOCLING] localInput:', JSON.stringify(localInput));
+        formData.append('files', fs.createReadStream(localInput));
         formData.append('abort_on_error', 'false');
         formData.append('to_formats', 'json');
         formData.append('return_as_file', 'false');
@@ -76,7 +79,10 @@ export class DoclingDocumentParser extends BaseDocumentParser {
         formData.append('ocr_lang', 'en');
         formData.append('ocr_lang', 'ko');
         formData.append('table_mode', 'fast');
-        formData.append('files', fs.createReadStream(options.input));
+        console.log('[DOCLING] options.input:', JSON.stringify(options.input));
+        const localInput = options.input.replace(/^\/api\/static\/uploads\//, './public/uploads/');
+        console.log('[DOCLING] localInput:', JSON.stringify(localInput));
+        formData.append('files', fs.createReadStream(localInput));
         formData.append('abort_on_error', 'false');
         formData.append('to_formats', 'md');
         formData.append('return_as_file', 'false');

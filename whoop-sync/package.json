@@ -1,0 +1,14 @@
+{
+  "name": "whoop-sync",
+  "version": "1.0.0",
+  "description": "WHOOP data sync service for AI Health Hub",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "pg": "^8.12.0"
+  }
+}

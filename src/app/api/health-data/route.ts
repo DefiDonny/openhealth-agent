@@ -1,12 +1,12 @@
 import prisma, {Prisma} from "@/lib/prisma";
 import {NextRequest, NextResponse} from "next/server";
-import {parseHealthData} from "@/lib/health-data/parser/pdf";
+// parseHealthData removed - using direct Claude Vision pipeline
 import crypto from "node:crypto";
 import {fileTypeFromBuffer} from "file-type";
 import sharp from 'sharp'
 import {auth} from "@/auth";
-import {put} from "@vercel/blob";
-import {currentDeploymentEnv} from "@/lib/current-deployment-env";
+// vercel blob removed for self-hosted
+// deployment env not needed for self-hosted
 import fs from 'fs'
 
 export interface HealthData extends Prisma.HealthDataGetPayload<{
@@ -64,15 +64,8 @@ export async function POST(
         const id = formData.get('id')
 
         // Vision Parser
-        const visionParser = formData.get('visionParser')
-        const visionParserModel = formData.get('visionParserModel')
-        const visionParserApiKey = formData.get('visionParserApiKey')
-        const visionParserApiUrl = formData.get('visionParserApiUrl')
 
         // Document Parser
-        const documentParser = formData.get('documentParser')
-        const documentParserModel = formData.get('documentParserModel')
-        const documentParserApiKey = formData.get('documentParserApiKey')
 
         let filePath: string | undefined
         let fileType: string | undefined
@@ -93,32 +86,18 @@ export async function POST(
             if (mime.startsWith('image/')) {
                 const outputBuffer = await sharp(fileBuffer).png().toBuffer()
                 const filename = `${fileHash}.png`;
-                if (currentDeploymentEnv === 'local') {
+                if (true) {
                     fs.writeFileSync(`./public/uploads/${filename}`, outputBuffer)
-                    filePath = `${process.env.NEXT_PUBLIC_URL}/api/static/uploads/${filename}`
-                } else {
-                    const blob = await put(`/uploads/${filename}`, outputBuffer, {
-                        access: 'public',
-                        contentType: 'image/png'
-                    })
-                    filePath = blob.downloadUrl
+                    filePath = `/api/static/uploads/${filename}`
                 }
                 fileType = 'image/png'
                 baseData = {fileName: file.name}
             } else {
-                if (currentDeploymentEnv === 'local') {
+                if (true) {
                     const extension = file.name.split('.').pop()
                     const filename = `${fileHash}.${extension}`;
                     fs.writeFileSync(`./public/uploads/${filename}`, fileBuffer)
-                    filePath = `${process.env.NEXT_PUBLIC_URL}/api/static/uploads/${filename}`
-                } else {
-                    const extension = file.name.split('.').pop()
-                    const filename = `${fileHash}.${extension}`;
-                    const blob = await put(`/uploads/${filename}`, fileBuffer, {
-                        access: 'public',
-                        contentType: mime
-                    })
-                    filePath = blob.downloadUrl
+                    filePath = `/api/static/uploads/${filename}`
                 }
                 fileType = mime
                 baseData = {fileName: file.name}
@@ -140,30 +119,80 @@ export async function POST(
                 },
             });
 
-            // Process file
-            const {data, pages, ocrResults} = await parseHealthData({
-                file: filePath as string,
-                visionParser: visionParser ? {
-                    parser: visionParser as string,
-                    model: visionParserModel as string,
-                    apiKey: visionParserApiKey as string,
-                    apiUrl: visionParserApiUrl ? visionParserApiUrl as string : undefined
-                } : undefined,
-                documentParser: documentParser ? {
-                    parser: documentParser as string,
-                    model: documentParserModel as string,
-                    apiKey: documentParserApiKey as string
-                } : undefined
-            })
+            // ===== SIMPLE DOCUMENT PROCESSING (Claude Vision) =====
+            // Read the uploaded file
+            const uploadedFileBuffer = fs.readFileSync(`./public/uploads/${filePath?.split('/').pop()}`);
+            const uploadedFileType = await fileTypeFromBuffer(uploadedFileBuffer);
+            const uploadedMime = uploadedFileType?.mime || fileType || 'application/octet-stream';
+            
+            // Convert to images
+            const imageBase64List: string[] = [];
+            if (uploadedMime === 'application/pdf') {
+                // PDF: convert each page to PNG using pdf2pic
+                const {fromBuffer: pdf2picFromBuffer} = await import('pdf2pic');
+                const converter = pdf2picFromBuffer(uploadedFileBuffer, {preserveAspectRatio: true});
+                const pages = await converter.bulk(-1, {responseType: 'base64'});
+                for (const page of pages) {
+                    if (page.base64) imageBase64List.push(page.base64);
+                }
+            } else if (uploadedMime.startsWith('image/')) {
+                imageBase64List.push(uploadedFileBuffer.toString('base64'));
+            }
 
-            // Update health data with parsed data
+            // Send each image to Claude Vision for text extraction
+            const parsingLogs: string[] = [];
+            let extractedText = '';
+            const anthropicKey = process.env.ANTHROPIC_API_KEY;
+            
+            for (let i = 0; i < imageBase64List.length; i++) {
+                try {
+                    const mediaType = uploadedMime === 'application/pdf' ? 'image/png' : uploadedMime;
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': anthropicKey || '',
+                            'anthropic-version': '2023-06-01'
+                        },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 4096,
+                            messages: [{
+                                role: 'user',
+                                content: [
+                                    { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64List[i] }},
+                                    { type: 'text', text: 'Extract ALL medical test results, health data, and clinical information from this document. For each test result include: test name, result value, unit, and reference range. Also extract patient info, dates, doctor name, hospital/clinic name. Return as structured text.' }
+                                ]
+                            }]
+                        })
+                    });
+                    const result = await response.json() as {content?: Array<{text?: string}>, error?: {message?: string}};
+                    if (result.content?.[0]?.text) {
+                        extractedText += (i > 0 ? '\n\n--- Page ' + (i+1) + ' ---\n\n' : '') + result.content[0].text;
+                        parsingLogs.push('Page ' + (i+1) + ': extracted ' + result.content[0].text.length + ' chars');
+                    } else if (result.error) {
+                        parsingLogs.push('Page ' + (i+1) + ' error: ' + (result.error.message || JSON.stringify(result.error)));
+                    }
+                } catch (pageError) {
+                    parsingLogs.push('Page ' + (i+1) + ' error: ' + (pageError as Error).message);
+                }
+            }
+
+            // Build the final data object
+            const parsedData = {
+                fileName: baseData?.fileName || 'Unknown',
+                extractedText: extractedText,
+                parsingLogs: parsingLogs,
+                pageCount: imageBase64List.length,
+                parsedAt: new Date().toISOString()
+            };
+
             healthData = await prisma.healthData.update({
                 where: {id: healthData.id},
                 data: {
-                    status: 'COMPLETED',
-                    metadata: JSON.parse(JSON.stringify({ocr: ocrResults[0], dataPerPage: pages[0]})),
-                    data: {...baseData, ...data[0]}
-                }
+                    status: extractedText ? 'COMPLETED' : 'FAILED',
+                    data: parsedData as Prisma.InputJsonValue,
+                },
             });
             return NextResponse.json(healthData);
         } catch (error) {

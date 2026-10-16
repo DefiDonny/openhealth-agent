@@ -80,7 +80,8 @@ export async function POST() {
                 authorId: user.id,
                 name: 'New Chat',
                 assistantModeId: assistantModeId,
-                llmProviderId: (await prisma.lLMProvider.findFirstOrThrow({where: {authorId: user.id}})).id,
+                llmProviderId: (await prisma.lLMProvider.findFirstOrThrow({where: {authorId: user.id}, orderBy: {order: 'asc'}})).id,
+                llmProviderModelId: 'claude-sonnet-4-6',
             },
         });
     });

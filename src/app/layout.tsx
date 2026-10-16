@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "OpenHealth",
-    description: "OpenHealth",
+    title: "OpenHealth Agent",
+    description: "OpenHealth Agent",
 };
 
 export default async function RootLayout({children, modal}: Readonly<{
