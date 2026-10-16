@@ -29,6 +29,37 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       AUTH_SECRET: ${AUTH_SECRET}
       DEPLOYMENT_ENV: ${DEPLOYMENT_ENV}
+      SYNC_API_KEY: ${SYNC_API_KEY}
+      SYNC_SERVICE_URL: http://whoop-sync:3001
+  whoop-sync:
+    build:
+      context: ./whoop-sync
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+    - database
+    ports:
+    - 127.0.0.1:3001:3001
+    environment:
+      BIND_HOST: 0.0.0.0
+      POSTGRES_HOST: database
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      WHOOP_CLIENT_ID: ${WHOOP_CLIENT_ID}
+      WHOOP_CLIENT_SECRET: ${WHOOP_CLIENT_SECRET}
+      WHOOP_REDIRECT_URI: ${WHOOP_REDIRECT_URI}
+      WITHINGS_CLIENT_ID: ${WITHINGS_CLIENT_ID}
+      WITHINGS_CLIENT_SECRET: ${WITHINGS_CLIENT_SECRET}
+      WITHINGS_REDIRECT_URI: ${WITHINGS_REDIRECT_URI}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      SYNC_API_KEY: ${SYNC_API_KEY}
+      SYNC_CRON_ENABLED: 'true'
+      TOKEN_FILE: /app/tokens/tokens.json
+      WITHINGS_TOKEN_FILE: /app/tokens/withings_tokens.json
+    volumes:
+    - sync_tokens:/app/tokens
 volumes:
   postgres_data: null
   app_data: null
+  sync_tokens: null

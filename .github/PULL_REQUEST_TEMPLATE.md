@@ -1,14 +1,15 @@
----
-name: 🔄 Pull Request
-about: Create a pull request for OpenHealth
----
+## What & why
 
-<!-- 👋 Thanks for contributing! A few quick things:
-- 📚 See our contributing guide: https://github.com/OpenHealthForAll/open-health/blob/main/CONTRIBUTING.md
-- 🌱 New contributor? Try our good first issues: https://github.com/OpenHealthForAll/open-health/labels/good%20first%20issue -->
+<!-- Short description of the change and the problem it solves. -->
 
-## What's changed?
-<!-- Describe your changes -->
+## Checklist
 
-## ✨ Screenshots (optional)
-<!-- Add screenshots if helpful --> 
+- [ ] Build passes (`npm ci && npm run build`), and the sync service passes `node --check`
+- [ ] No real health data, credentials, personal names/domains or server paths added
+- [ ] Configuration comes from environment variables (no credential literals)
+- [ ] Docs updated where behaviour or setup changed
+- [ ] I agree my contribution is licensed under AGPL-3.0
+
+## Related issue
+
+Closes #
