@@ -37,7 +37,18 @@ export async function GET(
     req: NextRequest,
     {params}: { params: Promise<{ id: string }> }
 ) {
+    const session = await auth()
+    const user = session?.user
+    const userId = user?.id
+    if (!session || !user || !userId) return NextResponse.json({error: 'Unauthorized'}, {status: 401})
+
     const {id} = await params
+    const owned = await prisma.chatRoom.findFirst({
+        where: {id, authorId: userId},
+        select: {id: true}
+    })
+    if (!owned) return NextResponse.json({error: 'Chat room not found'}, {status: 404})
+
     const chatMessages = await prisma.chatMessage.findMany({
         where: {chatRoomId: id},
         orderBy: {createdAt: 'asc'}
@@ -54,9 +65,16 @@ export async function POST(
 ) {
     const session = await auth()
     const user = session?.user
-    if (!session || !user) return NextResponse.json({error: 'Unauthorized'}, {status: 401})
+    const userId = user?.id
+    if (!session || !user || !userId) return NextResponse.json({error: 'Unauthorized'}, {status: 401})
 
     const {id} = await params
+    const owned = await prisma.chatRoom.findFirst({
+        where: {id, authorId: userId},
+        select: {id: true}
+    })
+    if (!owned) return NextResponse.json({error: 'Chat room not found'}, {status: 404})
+
     const body: ChatMessageCreateRequest = await req.json()
 
     const {
