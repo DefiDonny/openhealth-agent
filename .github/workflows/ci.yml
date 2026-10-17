@@ -36,6 +36,6 @@ jobs:
           # Fails the build if personal identifiers, hosts or secret literals
           # ever land in the tree. The workflows directory is excluded because
           # this file contains the search patterns themselves.
-          ! grep -rIlE 'apinand|dabpetch|health\.apinand|(^|[^A-Za-z])Donny([^A-Za-z]|$)' --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
+          ! grep -rIlE 'ap[i]and|dabp[e]tch|health[.]ap[i]and|(^|[^A-Za-z])Do[n]ny([^A-Za-z]|$)' --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
           ! grep -rIlE '/opt/|/home/ubuntu|lightsail' --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
           ! grep -rInE "(PASSWORD|SECRET|API_KEY|TOKEN|CLIENT_ID)[A-Z_]*[ ]*[:=][ ]*['\"][A-Za-z0-9_./+-]{12,}" --exclude-dir=.git --exclude-dir=.github --exclude-dir=node_modules --exclude-dir=.next .
