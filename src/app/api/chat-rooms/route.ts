@@ -81,7 +81,7 @@ export async function POST() {
                 name: 'New Chat',
                 assistantModeId: assistantModeId,
                 llmProviderId: (await prisma.lLMProvider.findFirstOrThrow({where: {authorId: user.id}, orderBy: {order: 'asc'}})).id,
-                llmProviderModelId: 'claude-sonnet-5-5',
+                llmProviderModelId: process.env.DEFAULT_CHAT_MODEL || 'claude-opus-5-5',
             },
         });
     });

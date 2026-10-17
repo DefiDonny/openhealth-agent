@@ -33,6 +33,10 @@ Baseline: [OpenHealthForAll/open-health](https://github.com/OpenHealthForAll/ope
 - All configuration externalized; no credentials, personal names, domains or server
   paths in the tree (verified by automated scan before every push).
 
+## Configuration
+- `DEFAULT_CHAT_MODEL` selects the model for new consultations (default `claude-opus-5-5`).
+- Builds are reproducible: the image installs from the lockfile (`npm ci`).
+
 ## Notes
 - Language packs are upstream's (de/en/es/fr/ja/ko/ru/uk/ur/zh); the new components
   are English-only for now. Internationalizing them is on the roadmap.

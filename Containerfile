@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY package.json prisma/ .
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 

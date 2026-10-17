@@ -39,7 +39,7 @@ a community fork that keeps it working and usable day to day:
 | Wearable/scale sync | — | WHOOP + Withings service, permanent merge |
 | Manual readings | — | `MANUAL_READINGS` + `/api/readings` |
 | Dashboard | basic | weight/sleep sparklines with axes + tooltips |
-| Model support | Claude 3.5/3.7 only | current models (the chat default ships as `claude-sonnet-5-5`) |
+| Model support | Claude 3.5/3.7 only | current models (default `claude-opus-5-5`, configurable via `DEFAULT_CHAT_MODEL`) |
 | Deployment | manual | one-command Docker Compose + self-hosting guide |
 | Secrets | literals in code | environment-only, no fallbacks |
 | Sync/OAuth endpoints | unauthenticated | key-gated; OAuth state-protected |
