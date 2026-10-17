@@ -109,7 +109,7 @@ ON CONFLICT (id) DO NOTHING;
 
 COMMIT;
 
-SELECT type, json_array_length(
+SELECT type, jsonb_array_length(
   CASE WHEN type = 'MANUAL_READINGS' THEN data->'readings'
        ELSE data->'measurements' END
 ) AS demo_rows
