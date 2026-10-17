@@ -1,4 +1,5 @@
 import prisma, {Prisma} from "@/lib/prisma";
+import {defaultChatModel, providerIdForModel} from '@/lib/default-llm';
 import {NextResponse} from "next/server";
 import {auth} from "@/auth";
 
@@ -80,8 +81,13 @@ export async function POST() {
                 authorId: user.id,
                 name: 'New Chat',
                 assistantModeId: assistantModeId,
-                llmProviderId: (await prisma.lLMProvider.findFirstOrThrow({where: {authorId: user.id}, orderBy: {order: 'asc'}})).id,
-                llmProviderModelId: process.env.DEFAULT_CHAT_MODEL || 'claude-opus-5-5',
+                llmProviderId: (await prisma.lLMProvider.findFirst({
+                    where: {authorId: user.id, providerId: providerIdForModel(defaultChatModel())}
+                }) ?? (await prisma.lLMProvider.findFirstOrThrow({
+                    where: {authorId: user.id},
+                    orderBy: {order: 'asc'}
+                }))).id,
+                llmProviderModelId: defaultChatModel(),
             },
         });
     });

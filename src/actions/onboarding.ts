@@ -1,6 +1,7 @@
 'use server';
 
 import {PersonalInfoData} from "@/components/onboarding/PersonalInfo";
+import {defaultChatModel, providerIdForModel} from '@/lib/default-llm';
 import prisma from "@/lib/prisma";
 import {auth} from "@/auth";
 
@@ -55,7 +56,13 @@ export async function onboardingSubmit(data: OnboardingSubmitRequest) {
         await prisma.user.update({where: {id: userId}, data: {hasOnboarded: true}})
 
         // ChatRoom assistant modes 채팅 전부 생성
-        const llmProvider = await prisma.lLMProvider.findFirstOrThrow({where: {providerId: 'openai'}})
+        const defaultModel = defaultChatModel();
+        const llmProvider = (await prisma.lLMProvider.findFirst({
+            where: {authorId: userId, providerId: providerIdForModel(defaultModel)}
+        })) ?? (await prisma.lLMProvider.findFirstOrThrow({
+            where: {authorId: userId},
+            orderBy: {order: 'asc'}
+        }));
         const assistantModes = await prisma.assistantMode.findMany({
             where: {
                 OR: [
@@ -72,7 +79,7 @@ export async function onboardingSubmit(data: OnboardingSubmitRequest) {
                     authorId: userId,
                     assistantModeId: mode.id,
                     llmProviderId: llmProvider.id,
-                    llmProviderModelId: 'o3-mini'
+                    llmProviderModelId: defaultModel
                 }
             })
         })

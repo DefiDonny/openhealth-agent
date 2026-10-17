@@ -1,4 +1,5 @@
 import {redirect} from "next/navigation";
+import {defaultChatModel, providerIdForModel} from '@/lib/default-llm';
 import prisma from "@/lib/prisma";
 import {auth} from "@/auth";
 import {currentDeploymentEnv} from "@/lib/current-deployment-env";
@@ -32,12 +33,19 @@ export default async function Page() {
     let chatRoom = lastChatRoom
     if (!lastChatRoom) {
         const assistantMode = await prisma.assistantMode.findFirstOrThrow({where: {authorId: session.user.id}})
-        const llmProvider = await prisma.lLMProvider.findFirstOrThrow({where: {authorId: session.user.id}})
+        const defaultModel = defaultChatModel();
+        const llmProvider = (await prisma.lLMProvider.findFirst({
+            where: {authorId: session.user.id, providerId: providerIdForModel(defaultModel)}
+        })) ?? (await prisma.lLMProvider.findFirstOrThrow({
+            where: {authorId: session.user.id},
+            orderBy: {order: 'asc'}
+        }));
         chatRoom = await prisma.chatRoom.create({
             data: {
                 name: 'Chat',
                 assistantModeId: assistantMode.id,
                 llmProviderId: llmProvider.id,
+                llmProviderModelId: defaultModel,
                 authorId: session.user.id,
             }
         })
