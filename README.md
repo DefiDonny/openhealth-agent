@@ -10,7 +10,9 @@ required.
 
 ## Screenshots
 
-_Coming from the demo instance (synthetic data) — see [`demo/`](demo/README.md)._
+![Consultation: an AI doctor reviewing a month of sleep data and a blood panel](docs/assets/screenshot-consultation.png)
+
+*All numbers shown are synthetic (see [`demo/`](demo/README.md)) — no real measurements appear in this repo.*
 
 ## What it does
 
