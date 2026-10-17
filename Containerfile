@@ -5,7 +5,7 @@ RUN apk add -U graphicsmagick ghostscript
 
 WORKDIR /app
 
-COPY package.json prisma/ .
+COPY package.json package-lock.json prisma/ .
 
 RUN npm ci
 
