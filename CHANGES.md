@@ -32,6 +32,9 @@ Baseline: [OpenHealthForAll/open-health](https://github.com/OpenHealthForAll/ope
   secrets via environment variables only (`.env.example` provided).
 - All configuration externalized; no credentials, personal names, domains or server
   paths in the tree (verified by automated scan before every push).
+- `release-trigger-prod.yml` (upstream's Trigger.dev deploy) kept but switched to
+  manual `workflow_dispatch` — it needs upstream's Trigger.dev secrets and failed on
+  every push in forks. Background jobs here run via the `whoop-sync` service instead.
 
 ## Configuration
 - `DEFAULT_CHAT_MODEL` selects the model for new consultations (default `claude-opus-5-5`).

@@ -1,9 +1,10 @@
 name: Deploy to Trigger.dev (prod)
 
+# Upstream auto-deploys to Trigger.dev on push to main. Forks have no Trigger.dev
+# project secrets, so the auto-run only produces a public red X. Kept for
+# reference; run manually via workflow_dispatch if Trigger.dev is ever adopted.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
