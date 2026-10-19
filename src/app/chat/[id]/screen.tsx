@@ -2,13 +2,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Send, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Activity, FileText, Pill, Upload, FolderOpen, MessageCircle, Trash2} from 'lucide-react';
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
+import {PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Activity, FileText, Pill, Upload, FolderOpen, MessageCircle, Trash2} from 'lucide-react';
 import Link from "next/link";
 
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import ChatMessage from "@/components/chat/chat-message";
+import ChatComposer, {ChatAttachment} from "@/components/chat/chat-composer";
 import useSWR from "swr";
 import {useParams, useRouter} from "next/navigation";
 import {ChatMessageListResponse} from "@/app/api/chat-rooms/[id]/messages/route";
@@ -193,7 +192,6 @@ export default function Screen(
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const [inputText, setInputText] = useState('');
     const [sources] = useState([]);
     const [isJsonViewerOpen, setIsJsonViewerOpen] = useState(false);
     const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(!isMobile);
@@ -292,48 +290,61 @@ export default function Screen(
         }
     }, [messages]);
 
-    const handleSendMessage = async () => {
-        if (!inputText.trim()) return;
-        setInputText('');
+    const handleSendMessage = async (text: string, attachments: ChatAttachment[] = []) => {
+        const trimmed = text.trim();
+        if (!trimmed && attachments.length === 0) return;
 
-        const oldMessages = [...messages, {
-            id: new Date().toISOString(),
-            content: inputText,
+        const optimistic = {
+            id: 'local-' + Date.now(),
+            content: trimmed,
             role: 'USER' as ChatRole,
             createdAt: new Date(),
-        }];
+            attachments: attachments,
+        } as any;
+        const oldMessages = [...messages, optimistic];
         await mutate({chatMessages: oldMessages}, {revalidate: false});
 
-        const response = await fetch(`/api/chat-rooms/${id}/messages`, {
+        const response = await fetch('/api/chat-rooms/' + id + '/messages', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ content: inputText, role: 'USER' })
+            body: JSON.stringify({content: trimmed, role: 'USER', attachments: attachments})
         });
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-        const createdAt = new Date()
+        const createdAt = new Date();
+        let pending = '';
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        // Batch stream updates: one re-render per ~60ms instead of one per token.
+        const flush = () => {
+            timer = null;
+            if (!pending) return;
+            void mutate({
+                chatMessages: [...oldMessages, {id: 'streaming', content: pending, role: 'ASSISTANT', createdAt}]
+            }, {revalidate: false});
+        };
+        const schedule = () => {
+            if (timer === null) timer = setTimeout(flush, 60);
+        };
+
         if (reader) {
             let done = false;
             while (!done) {
-                const {value, done: isDone} = await reader.read();
-                done = isDone;
-                const content = decoder.decode(value, {stream: !done});
-                for (const data of content.split('\n').filter(Boolean)) {
-                    const {content, error}: { content?: string, error?: string } = JSON.parse(data)
-                    if (error) { console.error('Error from LLM:', error); continue; }
-                    if (content) {
-                        await mutate({
-                            chatMessages: [
-                                ...oldMessages,
-                                {id: new Date().toISOString(), content: content, role: 'ASSISTANT', createdAt}
-                            ]
-                        }, {revalidate: false});
-                    }
+                const chunk = await reader.read();
+                done = chunk.done;
+                const decoded = chunk.value ? decoder.decode(chunk.value, {stream: !done}) : '';
+                for (const data of decoded.split('\n')) {
+                    if (!data) continue;
+                    let parsed: {content?: string, error?: string};
+                    try { parsed = JSON.parse(data); } catch { continue; }
+                    if (parsed.error) { console.error('Error from LLM:', parsed.error); continue; }
+                    if (parsed.content) { pending = parsed.content; schedule(); }
                 }
             }
-            await mutate();
         }
+        if (timer !== null) { clearTimeout(timer); timer = null; }
+        await mutate();
     };
 
     const handleStartNewChat = async () => {
@@ -660,20 +671,7 @@ export default function Screen(
                     <div className="mb-16 md:mb-0">
                         <div className="border-t p-4 z-10 md:static fixed bottom-0 left-0 w-full bg-white">
                             <div className="flex gap-2">
-                                <Input
-                                    placeholder={t('inputPlaceholder')}
-                                    value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSendMessage();
-                                        }
-                                    }}
-                                />
-                                <Button onClick={handleSendMessage}>
-                                    <Send className="w-4 h-4"/>
-                                </Button>
+                                <ChatComposer onSend={handleSendMessage} placeholder={t('inputPlaceholder')}/>
                             </div>
                         </div>
                     </div>

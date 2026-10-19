@@ -22,10 +22,16 @@ export async function GET(
     const file = await fs.readFile(filePath)
 
     // Response blob
+    const ext = (filename.split('.').pop() || '').toLowerCase()
+    const isImage = ext === 'png' || ext === 'jpg' || ext === 'jpeg'
+    const mime = isImage ? (ext === 'png' ? 'image/png' : 'image/jpeg') : 'application/pdf'
+
     return new Response(file, {
         headers: {
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': `attachment; filename=${filename}`
+            'Content-Type': mime,
+            // Images must be inline + a real image type, otherwise nosniff stops <img> rendering.
+            'Content-Disposition': (isImage ? 'inline' : 'attachment') + '; filename=' + filename,
+            'Cache-Control': 'private, max-age=3600'
         }
     })
 }

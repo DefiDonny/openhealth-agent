@@ -108,6 +108,7 @@ model ChatMessage {
   content    String
   chatRoomId String
   role       ChatRole
+  attachments Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

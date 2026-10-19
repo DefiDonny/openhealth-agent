@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {NextRequest, NextResponse} from "next/server";
 import prisma, {Prisma} from "@/lib/prisma";
 import {auth} from "@/auth";
@@ -6,13 +7,16 @@ import {currentDeploymentEnv} from "@/lib/current-deployment-env";
 import {ChatOpenAI} from "@langchain/openai";
 import {ChatAnthropic} from "@langchain/anthropic";
 import {ChatGoogleGenerativeAI} from "@langchain/google-genai";
+import fs from "fs";
+import path from "path";
 
 export interface ChatMessage extends Prisma.ChatMessageGetPayload<{
     select: {
         id: true,
         content: true,
         createdAt: true,
-        role: true
+        role: true,
+        attachments: true
     }
 }> {
     id: string,
@@ -25,12 +29,40 @@ export interface ChatMessageListResponse {
 export interface ChatMessageCreateRequest {
     content: string,
     role: 'USER' | 'ASSISTANT',
+    attachments?: Array<{url: string, mime?: string, name?: string}>,
     settings?: {
         company: string,
         model: string,
         apiEndpoint: string,
         apiKey: string
     }
+}
+
+function blockToDataUrl(url: string): string | null {
+    try {
+        const name = (url || '').split('/').pop() || '';
+        if (!name) return null;
+        const full = path.join(process.cwd(), 'public', 'uploads', name);
+        if (!fs.existsSync(full)) return null;
+        const buf = fs.readFileSync(full);
+        const ext = (name.split('.').pop() || '').toLowerCase();
+        const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+        return 'data:' + mime + ';base64,' + buf.toString('base64');
+    } catch {
+        return null;
+    }
+}
+
+function toOllamaMessages(msgs: any[]): any[] {
+    return msgs.map((m: any) => {
+        if (typeof m.content === 'string') return m;
+        const texts = m.content.filter((b: any) => b.type === 'text').map((b: any) => b.text);
+        const images = m.content
+            .filter((b: any) => b.type === 'image_url' && b.image_url && b.image_url.url)
+            .map((b: any) => String(b.image_url.url).split(',')[1])
+            .filter(Boolean);
+        return {role: m.role, content: texts.join('\n'), images: images};
+    });
 }
 
 export async function GET(
@@ -84,7 +116,7 @@ export async function POST(
         healthDataList,
         llmProvider
     } = await prisma.$transaction(async (prisma) => {
-        await prisma.chatMessage.create({data: {content: body.content, role: body.role, chatRoomId: id}});
+        await prisma.chatMessage.create({data: {content: body.content, role: body.role, chatRoomId: id, attachments: body.attachments && body.attachments.length > 0 ? body.attachments : undefined}});
         const {assistantMode} = await prisma.chatRoom.update({
             where: {id},
             data: {lastActivityAt: new Date()},
@@ -125,16 +157,39 @@ export async function POST(
         }
     }
 
+    // Only the most recent few image-bearing turns are re-sent to the model, to bound token cost.
+    const imageEligible = new Set<number>();
+    {
+        const withImages: number[] = [];
+        chatMessages.forEach((m, i) => {
+            const a: any[] = Array.isArray((m as any).attachments) ? (m as any).attachments : [];
+            if (m.role === 'USER' && a.length > 0) withImages.push(i);
+        });
+        withImages.slice(-4).forEach((i) => imageEligible.add(i));
+    }
+
     const messages = [
         {"role": "system" as const, "content": assistantMode.systemPrompt},
         {
             "role": "user" as const,
             "content": `Health data sources: ${healthDataList.map((healthData) => `${healthData.type}: ${JSON.stringify(healthData.data)}`).join('\n')}`
         },
-        ...chatMessages.map((message) => ({
-            role: message.role.toLowerCase() as 'user' | 'assistant',
-            content: message.content
-        }))
+        ...chatMessages.map((message, idx) => {
+            const role = message.role.toLowerCase() as 'user' | 'assistant';
+            const atts: any[] = Array.isArray((message as any).attachments) ? (message as any).attachments : [];
+            if (role === 'user' && atts.length > 0 && imageEligible.has(idx)) {
+                const blocks: any[] = [];
+                if (message.content) blocks.push({type: 'text', text: message.content});
+                for (const a of atts) {
+                    const dataUrl = blockToDataUrl(a && a.url ? a.url : '');
+                    if (dataUrl) blocks.push({type: 'image_url', image_url: {url: dataUrl}});
+                }
+                if (blocks.some((b) => b.type === 'image_url')) {
+                    return {role: role, content: blocks};
+                }
+            }
+            return {role: role, content: message.content};
+        })
     ]
 
     const responseStream = new ReadableStream({
@@ -148,7 +203,7 @@ export async function POST(
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
                             model: chatRoom.llmProviderModelId,
-                            messages: messages,
+                            messages: toOllamaMessages(messages),
                             stream: true,
                         }),
                     });
