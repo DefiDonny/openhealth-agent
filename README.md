@@ -27,6 +27,9 @@ required.
   results (no Docling/OCR stack to babysit).
 - **Assistant modes** — GP, orthopaedics, nutrition, exercise, internal medicine, mental
   health: prepared context for the chat.
+- **Chat attachments** — paste or pick images into a consultation; downscaled in-browser
+  (2000 px / JPEG) and sent to vision-capable models as image content. Only the last 4
+  image-bearing turns are re-sent with each message, to bound token cost.
 - **Bring your own LLM** — configure the provider/model per consultation room.
 
 ## Why this version
@@ -78,6 +81,9 @@ immediately.
   `X-Sync-Key` header (browsers go through the app's authenticated relay at
   `/api/integrations/*`); OAuth callbacks remain public but are state-protected.
 - Uploads require a logged-in session.
+- Chat images are uploaded here and forwarded to your configured model provider as image
+  content — the same data flow as any text you type in chat. Vision support is verified
+  with Anthropic models (OpenAI expected to work; Google/Ollama untested).
 - App and database bind to `127.0.0.1` by default — expose only through your reverse proxy.
 
 ## Roadmap

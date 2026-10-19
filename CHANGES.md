@@ -15,6 +15,22 @@ Baseline: [OpenHealthForAll/open-health](https://github.com/OpenHealthForAll/ope
 - Sleep card: 30-point history with axis gridlines and tooltips.
 - Quick access connect/sync buttons for the wearable integrations.
 
+## Chat
+- Image attachments in the composer: paste from the clipboard or pick with the image
+  button; images are downscaled to 2000 px / JPEG in the browser before upload and
+  persisted on the message (`attachments`, nullable jsonb — additive schema change) so
+  they render in the transcript.
+- Multiline composer: auto-growing textarea (Enter sends, Shift+Enter for a newline).
+- Images go to the configured model provider as image content blocks on vision-capable
+  models; only the last 4 image-bearing turns are re-sent with each message to bound
+  token cost. Verified against Anthropic (`claude-opus-5-5`); the OpenAI path is
+  expected to work, Google/Ollama untested. webp/gif uploads are converted to JPEG
+  rather than rejected.
+- Chat performance: message rows memoised and streamed updates batched (~60 ms) — fixes
+  typing lag in long rooms.
+- Uploads are served with a real image MIME type and inline disposition (nosniff was
+  blocking thumbnails).
+
 ## Integrations
 - `whoop-sync/` service: WHOOP + Withings OAuth flows and daily merge-based sync
   (dedupe by date, newest first). Self-hosting setup docs describe how to create
