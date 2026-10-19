@@ -8,6 +8,15 @@ required.
 
 > Community-maintained, not affiliated with OpenHealthForAll — see Credits.
 
+## What's new
+
+- **2026-10-19 — Chat image attachments**: paste or pick images in a consultation
+  (downscaled to 2000 px / JPEG in-browser), multiline composer (Shift+Enter for
+  newlines), and a faster message stream. Full entry: [CHANGES.md](CHANGES.md#chat).
+- **2026-10-17 — Security hardening**: chat room and message endpoints now require a
+  logged-in session and room ownership.
+- Full history lives in [CHANGES.md](CHANGES.md).
+
 ## Screenshots
 
 ![Consultation: an AI doctor reviewing a month of sleep data and a blood panel](docs/assets/screenshot-consultation.png)
