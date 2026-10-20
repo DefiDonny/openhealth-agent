@@ -12,7 +12,7 @@ Compose. Expect about 10 minutes end to end.
 ## 2. Configure
 
 ```bash
-git clone https://github.com/OWNER/openhealth-agent.git
+git clone https://github.com/openhealth-agent/openhealth-agent.git
 cd openhealth-agent
 cp .env.example .env
 ```
@@ -33,6 +33,10 @@ Edit `.env` and fill in:
 ```bash
 docker compose up -d --build
 ```
+
+Prefer pulling a prebuilt image over building? In `docker-compose.yaml`, replace the app
+service's `build:` block with `image: ghcr.io/openhealth-agent/openhealth-agent:v0.3.0`
+and run `docker compose up -d` — only the tiny `whoop-sync` service still builds locally.
 
 That starts:
 
