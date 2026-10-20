@@ -10,12 +10,11 @@ required.
 
 ## What's new
 
+- **2026-10-20 — Deploy with your AI**: copy [`docs/DEPLOY-PROMPT.md`](docs/DEPLOY-PROMPT.md) into any AI assistant with shell access to your server — it runs the full setup end to end and asks you the right questions along the way.
 - **2026-10-20 — [`v0.3.0` released](https://github.com/openhealth-agent/openhealth-agent/releases/tag/v0.3.0)**: first versioned release, with a prebuilt container image — `docker pull ghcr.io/openhealth-agent/openhealth-agent:v0.3.0`.
 - **2026-10-19 — Chat image attachments**: paste or pick images in a consultation
   (downscaled to 2000 px / JPEG in-browser), multiline composer (Shift+Enter for
   newlines), and a faster message stream. Full entry: [CHANGES.md](CHANGES.md#chat).
-- **2026-10-17 — Security hardening**: chat room and message endpoints now require a
-  logged-in session and room ownership.
 - Full history lives in [CHANGES.md](CHANGES.md).
 
 ## Screenshots
@@ -75,6 +74,10 @@ release).
 Put it behind a reverse proxy with TLS (nginx example in the self-hosting guide), open the
 site, create your account, and optionally seed the demo data to see the dashboard
 immediately.
+
+Handing this to an AI assistant? Copy [`docs/DEPLOY-PROMPT.md`](docs/DEPLOY-PROMPT.md)
+into it — the prompt runs the full setup on your server and asks you the right
+questions along the way.
 
 - Full guide: **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**
 - Device setup: **[WHOOP](docs/WHOOP-SETUP.md)** · **[Withings](docs/WITHINGS-SETUP.md)**

@@ -37,6 +37,8 @@ Baseline: [OpenHealthForAll/open-health](https://github.com/OpenHealthForAll/ope
   your own WHOOP/Withings developer apps.
 
 ## Fixes
+- Chat room and message endpoints require a logged-in session and room ownership;
+  unauthenticated and cross-room reads are rejected.
 - Model listing accepts current Claude models (upstream filter only matched
   `claude-3-5`/`claude-3-7`).
 - Default model selection on chat-room creation.
@@ -51,6 +53,8 @@ Baseline: [OpenHealthForAll/open-health](https://github.com/OpenHealthForAll/ope
 - `release-trigger-prod.yml` (upstream's Trigger.dev deploy) kept but switched to
   manual `workflow_dispatch` — it needs upstream's Trigger.dev secrets and failed on
   every push in forks. Background jobs here run via the `whoop-sync` service instead.
+- `docs/DEPLOY-PROMPT.md`: copy-paste prompt that lets a user's AI assistant deploy the
+  whole stack (secrets, build-or-pull, TLS, wearables, verification).
 
 ## Configuration
 - `DEFAULT_CHAT_MODEL` selects the model for new consultations (default `claude-opus-5-5`).
