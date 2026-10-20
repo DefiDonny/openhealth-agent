@@ -10,6 +10,7 @@ required.
 
 ## What's new
 
+- **2026-10-20 — [`v0.3.0` released](https://github.com/openhealth-agent/openhealth-agent/releases/tag/v0.3.0)**: first versioned release, with a prebuilt container image — `docker pull ghcr.io/openhealth-agent/openhealth-agent:v0.3.0`.
 - **2026-10-19 — Chat image attachments**: paste or pick images in a consultation
   (downscaled to 2000 px / JPEG in-browser), multiline composer (Shift+Enter for
   newlines), and a faster message stream. Full entry: [CHANGES.md](CHANGES.md#chat).
@@ -54,18 +55,22 @@ a community fork that keeps it working and usable day to day:
 | Manual readings | — | `MANUAL_READINGS` + `/api/readings` |
 | Dashboard | basic | weight/sleep sparklines with axes + tooltips |
 | Model support | Claude 3.5/3.7 only | current models (default `claude-opus-5-5`, configurable via `DEFAULT_CHAT_MODEL`) |
-| Deployment | manual | one-command Docker Compose + self-hosting guide |
+| Deployment | manual | one-command Docker Compose, self-hosting guide, prebuilt image |
 | Secrets | literals in code | environment-only, no fallbacks |
 | Sync/OAuth endpoints | unauthenticated | key-gated; OAuth state-protected |
 
 ## Quick start
 
 ```bash
-git clone https://github.com/DefiDonny/openhealth-agent.git
+git clone https://github.com/openhealth-agent/openhealth-agent.git
 cd openhealth-agent
 cp .env.example .env       # fill it in: openssl rand -hex 32 for the secrets
 docker compose up -d --build
 ```
+
+Prebuilt image for self-hosters who'd rather pull than build:
+`docker pull ghcr.io/openhealth-agent/openhealth-agent:v0.3.0` (`:latest` tracks the newest
+release).
 
 Put it behind a reverse proxy with TLS (nginx example in the self-hosting guide), open the
 site, create your account, and optionally seed the demo data to see the dashboard
@@ -101,7 +106,6 @@ immediately.
 - Blood-pressure card on the dashboard
 - Real internationalization (the upstream language packs cover the original UI; new
   components are English-only — Thai is planned)
-- Published container images (GHCR) so servers pull instead of building
 
 ## Contributing
 
